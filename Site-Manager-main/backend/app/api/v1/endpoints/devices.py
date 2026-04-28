@@ -100,6 +100,14 @@ async def import_devices_from_excel(
                 if value and value != 'None':
                     invalid_count += 1
 
+    # הגבלת מספר תאים לעיבוד (מניעת בעיות ביצועים)
+    MAX_CELLS = 50000
+    if processed_cells > MAX_CELLS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Too many cells to process. Maximum: {MAX_CELLS}, Found: {processed_cells}"
+        )
+
     if not found_macs:
         raise HTTPException(
             status_code=400,
