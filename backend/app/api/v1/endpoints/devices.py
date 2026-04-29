@@ -1,6 +1,10 @@
 import uuid # הוספנו כדי לטפל ב-UUID בצורה נכונה
-from fastapi import APIRouter, Depends, HTTPException, status
+import re
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session, joinedload
+
+import openpyxl
+import io
 
 from app.db.session import get_db
 from app.models.device import DevicePosition, Device
@@ -15,6 +19,148 @@ from logger_manager import LoggerManager
 
 
 router = APIRouter()
+
+
+def is_valid_mac(mac: str) -> bool:
+    """בודק אם המחרוזת היא כתובת MAC תקינה"""
+    mac = mac.strip()
+    pattern = r'^([0-9A-Fa-f]{2}[:\-\.]){5}([0-9A-Fa-f]{2})$'
+    return bool(re.match(pattern, mac))
+
+
+def normalize_mac(mac: str) -> str:
+    """ממיר כתובת MAC לפורמט אחיד עם נקודותיים"""
+    mac = mac.strip().upper()
+    # מסיר מפרידים ומוסיף נקודותיים
+    digits = re.sub(r'[:\-\.]', '', mac)
+    return ':'.join(digits[i:i+2] for i in range(0, 12, 2))
+
+
+# ══════════════════════════════════════════════════════
+#  IMPORT FROM EXCEL
+# ══════════════════════════════════════════════════════
+
+@router.post("/import/{section_id}")
+async def import_devices_from_excel(
+    section_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_operator)
+):
+    """
+    מייבא כתובות MAC מקובץ Excel לתא מסוים.
+    - קורא כל עמודה בכל שורה ומחפש כתובות MAC תקינות
+    - מדלג על כתובות שכבר קיימות במערכת
+    - מחזיר סיכום: כמה נוספו, כמה כפולות, כמה לא תקינות
+    """
+    # בדיקת הרשאות
+    if not current_user.is_admin_of_section(section_id):
+        raise HTTPException(
+            status_code=403,
+            detail="No admin permission for this section"
+        )
+
+    # בדיקת סוג קובץ
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Only Excel files (.xlsx, .xls) are supported"
+        )
+    
+    # הגבלת גודל קובץ (10MB מקסימום)
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    if hasattr(file, 'size') and file.size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="File too large. Maximum size is 10MB"
+        )
+
+    # קריאת הקובץ
+    try:
+        contents = await file.read()
+        wb = openpyxl.load_workbook(io.BytesIO(contents), data_only=True)
+        ws = wb.active
+    except Exception:
+        raise HTTPException(status_code=400, detail="Failed to read Excel file")
+
+    # איסוף כל כתובות ה-MAC מהקובץ
+    found_macs: list[str] = []
+    invalid_count: int = 0
+    processed_cells: int = 0
+
+    for row in ws.iter_rows(values_only=True):
+        for cell in row:
+            processed_cells += 1
+            if cell is None:
+                continue
+            value = str(cell).strip()
+            if not value:
+                continue
+
+            if is_valid_mac(value):
+                found_macs.append(normalize_mac(value))
+            else:
+                # תא לא ריק אבל לא MAC תקין — מונים אותו
+                if value and value != 'None':
+                    invalid_count += 1
+
+    # הגבלת מספר תאים לעיבוד (מניעת בעיות ביצועים)
+    MAX_CELLS = 50000
+    if processed_cells > MAX_CELLS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Too many cells to process. Maximum: {MAX_CELLS}, Found: {processed_cells}"
+        )
+
+    if not found_macs:
+        raise HTTPException(
+            status_code=400,
+            detail="No valid MAC addresses found in the file"
+        )
+
+    # הסרת כפולות בתוך הקובץ עצמו
+    unique_macs = list(dict.fromkeys(found_macs))
+    duplicates_in_file = len(found_macs) - len(unique_macs)
+
+    # בדיקה מה כבר קיים ב-DB
+    existing = db.query(Device).filter(
+        Device.identifier.in_(unique_macs)
+    ).all()
+    existing_macs = {d.identifier for d in existing}
+
+    # יצירת devices חדשים בלבד
+    new_macs = [mac for mac in unique_macs if mac not in existing_macs]
+    already_exists_count = len(existing_macs)
+
+    created = []
+    for mac in new_macs:
+        device = Device(identifier=mac, section_id=section_id)
+        db.add(device)
+        db.flush()
+        db.add(DevicePosition(device_id=device.id, x_pos=0.0, y_pos=0.0))
+        created.append(mac)
+
+    db.commit()
+
+    LoggerManager.log_audit(
+        user=current_user.username,
+        action="IMPORT_DEVICES_FROM_EXCEL",
+        target=f"Section:{section_id}",
+        details=f"Added: {len(created)}, Already exists: {already_exists_count}, Invalid: {invalid_count}"
+    )
+
+    return {
+        "success": True,
+        "summary": {
+            "total_in_file":     len(found_macs),
+            "added":             len(created),
+            "already_exists":    already_exists_count,
+            "duplicates_in_file": duplicates_in_file,
+            "invalid_cells":     invalid_count,
+            "processed_cells":   processed_cells,
+        },
+        "added_macs": created
+    }
 
 
 @router.get("/", response_model=list[DeviceResponse])
