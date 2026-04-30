@@ -1,10 +1,12 @@
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from 'react-router-dom';
+import { useMemo } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 
 import Sidebar      from './components/Sidebar.jsx';
 import Login        from './pages/Login.jsx';
 import Dashboard    from './pages/Dashboard.jsx';
 import Sites        from './pages/Sites.jsx';
+import Section      from './pages/Section.jsx';
 import Users        from './pages/Users.jsx';
 import Groups       from './pages/Groups.jsx';
 import Settings     from './pages/Settings.jsx';
@@ -54,8 +56,9 @@ const buildRouter = (user) => createBrowserRouter([
     children: [
       { index: true,          element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard',    element: <Dashboard /> },
-      { path: 'sites',        element: <AdminRoute><Sites /></AdminRoute> },
-      { path: 'groups',       element: <AdminRoute><Groups /></AdminRoute> },
+      { path: 'sites',         element: <AdminRoute><Sites /></AdminRoute> },
+      { path: 'section/:sectionId', element: <AdminRoute><Section /></AdminRoute> },
+      { path: 'groups',        element: <AdminRoute><Groups /></AdminRoute> },
       { path: 'users',        element: <AdminRoute><Users /></AdminRoute> },
       { path: 'bulk-actions', element: <AdminRoute><BulkActions /></AdminRoute> },
       { path: 'settings',     element: <Settings /> },
@@ -72,7 +75,7 @@ const buildRouter = (user) => createBrowserRouter([
 const AppRoutes = () => {
   const { user } = useAuth();
   // router נבנה פעם אחת — user משמש רק להחלטה login vs app
-  const router = buildRouter(user);
+  const router = useMemo(() => buildRouter(user), [user]);
   return <RouterProvider router={router} />;
 };
 

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from '../api.js';
+import axios from 'axios';
 
 
 const AuthContext = createContext(null)
@@ -14,12 +15,15 @@ export const AuthProvider = ({children}) => {
     useEffect(() => {
         const checkSession = async () => {
             try {
-                const {data} = await api.get('/api/v1/auth/me');
-
+                // משתמשים ב-axios ישירות כדי לעקוף את ה-interceptor
+                const {data} = await axios.get('/api/v1/auth/me', {
+                    withCredentials: true,
+                    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080'
+                });
 
                 //אם ה-COOKIE תקין מקבלים בחזרה את פרטי המשתמש מהשרת
                 setUser({username: data.username, role: data.role})
-            } catch {
+            } catch (error) {
                 //אם המתשמש לא מחובר ה-COOKIE לא קיים אמ פג תוקף
                 setUser(null)
             } finally {

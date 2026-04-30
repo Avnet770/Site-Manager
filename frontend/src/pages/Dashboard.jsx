@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Globe, Users, Layers, Monitor, Activity } from 'lucide-react';
+import { Globe, Users, Layers, Monitor, Activity, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api.js';
+import { LoadingSkeleton } from '../components/ui/index.js';
 
 // ── כרטיס סטטיסטיקה ──────────────────────────────────────────────
 const StatCard = ({ icon: Icon, label, value, color }) => (
@@ -51,8 +52,14 @@ const Dashboard = () => {
     groups:  0,
   });
 
+  // מצב loading ושגיאות
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
   useEffect(() => {
     const fetchStats = async () => {
+      setLoading(true);
+      setError('');
       try {
         const [sitesRes, devicesRes] = await Promise.all([
           api.get('/api/v1/sites/'),
@@ -79,22 +86,48 @@ const Dashboard = () => {
         setStats(updated);
       } catch (e) {
         console.error('Failed to fetch stats:', e);
+        setError('נכשל בטעינת הנתונים. אנא נסה שוב.');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchStats();
   }, [isAdmin]);
 
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 mt-1 text-sm">טוען נתונים...</p>
+        </div>
+        <LoadingSkeleton type="page" count={4} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
 
-      {/* כותרת */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          ברוך הבא, <span className="text-indigo-600">{user?.username}</span>
-        </h1>
-        <p className="text-gray-500 mt-1 text-sm">סקירה כללית של המערכת</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            ברוך הבא, <span className="text-indigo-600">{user?.username}</span>
+          </h1>
+          <p className="text-gray-500 mt-1 text-sm">סקירה כללית של המערכת</p>
+        </div>
       </div>
+
+      {/* הצגת שגיאה */}
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-xl">
+          <AlertCircle size={20} className="text-red-500 shrink-0" />
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      )}
 
       {/* כרטיסי סטטיסטיקה */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

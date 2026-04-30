@@ -20,27 +20,16 @@ def upgrade() -> None:
     # 1. הוספת ADMIN ל-enum - חייב לרוץ לפני שאר השינויים
     op.execute("ALTER TYPE userrole ADD VALUE IF NOT EXISTS 'admin'")
 
-    # 2. תיקון עמודות token_blacklist - החלפת expired_at ו-created_at ב-expires_at
-    op.add_column('token_blacklist', sa.Column('expires_at', sa.DateTime(), nullable=True))
-
-    # העתקת ערכים קיימים מ-expired_at ל-expires_at (אם יש שורות קיימות)
-    op.execute("UPDATE token_blacklist SET expires_at = expired_at")
-
-    # עכשיו הופכים ל-NOT NULL
-    op.alter_column('token_blacklist', 'expires_at', nullable=False)
-
-    # מחיקת עמודות ישנות
-    op.drop_column('token_blacklist', 'created_at')
-    op.drop_column('token_blacklist', 'expired_at')
+    # 2. יצירת טבלת token_blacklist אם היא לא קיימת
+    op.create_table('token_blacklist',
+        sa.Column('id', sa.UUID(), nullable=False),
+        sa.Column('token', sa.String(length=512), nullable=False),
+        sa.Column('revoked_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+        sa.Column('expires_at', sa.DateTime(), nullable=False),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('token')
+    )
 
 
 def downgrade() -> None:
-    op.add_column('token_blacklist', sa.Column(
-        'expired_at', postgresql.TIMESTAMP(), autoincrement=False, nullable=False
-    ))
-    op.add_column('token_blacklist', sa.Column(
-        'created_at', postgresql.TIMESTAMP(), server_default=sa.text('now()'),
-        autoincrement=False, nullable=False
-    ))
-    op.execute("UPDATE token_blacklist SET expired_at = expires_at")
-    op.drop_column('token_blacklist', 'expires_at')
+    op.drop_table('token_blacklist')

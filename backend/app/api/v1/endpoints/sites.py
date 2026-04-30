@@ -62,8 +62,8 @@ def create_section(section_data: SectionCreate, db: Session = Depends(get_db), c
     site = db.query(Site).filter(Site.id == section_data.site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
- 
-    new_section = Section(**section_data.model_dump())
+
+    new_section = Section(**section_data.model_dump(), user_id=current_user.id)
     db.add(new_section)
     db.commit()
     db.refresh(new_section)
@@ -97,6 +97,24 @@ def get_sections(site_id: uuid.UUID, db: Session = Depends(get_db), current_user
         raise HTTPException(status_code=403, detail="No access to any section in this site")
     
     return user_sections_in_site
+
+@router.get("/sections/{section_id}", response_model=SectionResponse)
+def get_section(section_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    section = db.query(Section).filter(Section.id == section_id).first()
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+    
+    # Check permissions
+    if current_user.role not in [UserRole.SUPERADMIN, UserRole.ADMIN]:
+        if section not in current_user.allowed_sections:
+            raise HTTPException(status_code=403, detail="No access to this section")
+    
+    # Build response with site_name
+    site = db.query(Site).filter(Site.id == section.site_id).first()
+    response_data = SectionResponse.model_validate(section)
+    response_data.site_name = site.name if site else None
+    
+    return response_data
 
 @router.patch("/sections/{section_id}", response_model=SectionResponse)
 def update_section(section_id: uuid.UUID, section_data: SectionUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_super_admin)):

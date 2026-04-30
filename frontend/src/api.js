@@ -34,9 +34,10 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // לא מנסים לרענן את בקשת הrrefresh עצמה — זה יגרום ללולאה אינסופית
+    // לא מנסים לרענן את בקשות אימות — זה גורם ללולאה אינסופית
     if (originalRequest.url?.includes('/auth/refresh') ||
-        originalRequest.url?.includes('/auth/login')) {
+        originalRequest.url?.includes('/auth/login') ||
+        originalRequest.url?.includes('/auth/me')) {
       return Promise.reject(error);
     }
 

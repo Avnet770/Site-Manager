@@ -1,14 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Bell, Shield, Key, Save, Monitor, Globe, CheckCircle } from 'lucide-react';
+import { Bell, Shield, Key, Save, Monitor, Globe } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api.js';
-
-const Toast = ({ msg }) => (
-  <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-gray-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-gray-700">
-    <CheckCircle size={18} className="text-green-400 shrink-0" />
-    <span className="text-sm font-medium">{msg}</span>
-  </div>
-);
+import { Toast, PageHeader } from '../components/ui/index.js';
 
 const Section = ({ title, icon: Icon, children, badge }) => (
   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -62,10 +56,8 @@ const Settings = () => {
   const [pwError,   setPwError]   = useState('');
   const [toast,     setToast]     = useState('');
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  };
+  const showToast = (msg) => setToast(msg);
+  const hideToast = () => setToast('');
 
   const handleDarkMode = (val) => {
     setDarkMode(val);
@@ -124,12 +116,13 @@ const Settings = () => {
 
   return (
     <div className="space-y-6">
-      {toast && <Toast msg={toast} />}
+      <Toast msg={toast} onClose={hideToast} />
 
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">העדפות אישיות והגדרות חשבון</p>
-      </div>
+      <PageHeader
+        title="Settings"
+        subtitle="העדפות אישיות והגדרות חשבון"
+        canAdd={false}
+      />
 
       {/* מראה */}
       <Section title="מראה" icon={Monitor}>

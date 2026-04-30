@@ -57,6 +57,7 @@ class SectionUpdate(BaseModel):
 class SectionResponse(SectionBase):
     id: uuid.UUID
     site_id: uuid.UUID
+    site_name: str | None = None  # ימולא דינמית מה-site
     created_at: datetime
 
     #כדי להמיר את האובייקט של SQLAlchemy לאובייקט של Pydantic

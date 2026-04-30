@@ -1,14 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Layers, Plus, UserPlus, CheckCircle } from 'lucide-react';
+import { Layers, Plus, UserPlus, RefreshCw } from 'lucide-react';
 import api from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
-
-const Toast = ({ msg }) => (
-  <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-gray-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-gray-700">
-    <CheckCircle size={18} className="text-green-400 shrink-0" />
-    <span className="text-sm font-medium">{msg}</span>
-  </div>
-);
+import { Toast, Modal, PageHeader, LoadingSkeleton } from '../components/ui/index.js';
 
 const Groups = () => {
   const { isSuperAdmin } = useAuth();
@@ -22,10 +16,8 @@ const Groups = () => {
   const [error,   setError]   = useState('');
   const [toast,   setToast]   = useState('');
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(''), 3000);
-  };
+  const showToast = (msg) => setToast(msg);
+  const hideToast = () => setToast('');
 
   const fetchAll = async () => {
     try {
@@ -74,22 +66,22 @@ const Groups = () => {
     }
   };
 
-  if (loading) return <div className="flex justify-center p-10 text-gray-400">טוען קבוצות...</div>;
+  // Loading Skeleton
+  if (loading) {
+    return <LoadingSkeleton type="page" count={3} />;
+  }
 
   return (
     <div className="space-y-6">
-      {toast && <Toast msg={toast} />}
+      <Toast msg={toast} onClose={hideToast} />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Groups</h1>
-          <p className="text-sm text-gray-500 mt-1">ניהול קבוצות גישה וחברים</p>
-        </div>
-        <button onClick={() => { setModal(true); setError(''); }}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-indigo-700 transition-all shadow-sm">
-          <Plus size={18} /> קבוצה חדשה
-        </button>
-      </div>
+      <PageHeader
+        title="Groups"
+        subtitle="ניהול קבוצות גישה וחברים"
+        onRefresh={fetchAll}
+        onAdd={() => { setModal(true); setError(''); }}
+        addLabel="קבוצה חדשה"
+      />
 
       {/* רשימת קבוצות */}
       <div className="grid gap-4">
@@ -131,71 +123,71 @@ const Groups = () => {
       </div>
 
       {/* Modal: יצירת קבוצה */}
-      {modal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">יצירת קבוצה חדשה</h2>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <input placeholder="שם הקבוצה" required
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-              <input placeholder="תיאור (אופציונלי)"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-              <select
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
-                value={form.classification} onChange={e => setForm({ ...form, classification: e.target.value })}>
-                <option value="viewer">Viewer</option>
-                <option value="operator">Operator</option>
-                <option value="admin">Admin</option>
-              </select>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setModal(false); setError(''); }}
-                  className="flex-1 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl text-sm">ביטול</button>
-                <button type="submit"
-                  className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm">צור קבוצה</button>
-              </div>
-            </form>
+      <Modal
+        isOpen={modal}
+        onClose={() => { setModal(false); setError(''); }}
+        title="יצירת קבוצה חדשה"
+        size="sm"
+      >
+        <form onSubmit={handleCreate} className="space-y-4">
+          <input placeholder="שם הקבוצה" required
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+          <input placeholder="תיאור (אופציונלי)"
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+            value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+          <select
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+            value={form.classification} onChange={e => setForm({ ...form, classification: e.target.value })}>
+            <option value="viewer">Viewer</option>
+            <option value="operator">Operator</option>
+            <option value="admin">Admin</option>
+          </select>
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => { setModal(false); setError(''); }}
+              className="flex-1 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl text-sm">ביטול</button>
+            <button type="submit"
+              className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm">צור קבוצה</button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
 
       {/* Modal: הוספת משתמש לקבוצה */}
-      {addUser && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">הוספת משתמש לקבוצה</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              קבוצה: <span className="font-medium text-indigo-600">{groups.find(g => g.id === addUser)?.name}</span>
-            </p>
-            <form onSubmit={handleAddUser} className="space-y-4">
-              <select
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
-                value={addForm.user_id}
-                onChange={e => setAddForm({ user_id: e.target.value })}
-                required>
-                <option value="">בחר משתמש</option>
-                {users
-                  .filter(u => u.role !== 'superadmin')
-                  .map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.username} ({u.role})
-                    </option>
-                  ))
-                }
-              </select>
-              {error && <p className="text-sm text-red-500">{error}</p>}
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => { setAddUser(null); setError(''); }}
-                  className="flex-1 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl text-sm">ביטול</button>
-                <button type="submit"
-                  className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm">הוסף</button>
-              </div>
-            </form>
+      <Modal
+        isOpen={!!addUser}
+        onClose={() => { setAddUser(null); setError(''); }}
+        title="הוספת משתמש לקבוצה"
+        size="sm"
+      >
+        <p className="text-sm text-gray-500 mb-4">
+          קבוצה: <span className="font-medium text-indigo-600">{groups.find(g => g.id === addUser)?.name}</span>
+        </p>
+        <form onSubmit={handleAddUser} className="space-y-4">
+          <select
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm bg-white"
+            value={addForm.user_id}
+            onChange={e => setAddForm({ user_id: e.target.value })}
+            required>
+            <option value="">בחר משתמש</option>
+            {users
+              .filter(u => u.role !== 'superadmin')
+              .map(u => (
+                <option key={u.id} value={u.id}>
+                  {u.username} ({u.role})
+                </option>
+              ))
+            }
+          </select>
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => { setAddUser(null); setError(''); }}
+              className="flex-1 px-4 py-3 text-gray-600 hover:bg-gray-50 rounded-xl text-sm">ביטול</button>
+            <button type="submit"
+              className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm">הוסף</button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   );
 };
